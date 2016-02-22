@@ -4,7 +4,7 @@
   "repositories": [
     {
       "type": "git",
-      "url": "git@github.com:codesource/Flow3.PHP-Server.git"
+      "url": "https://github.com/codesource/Flow3.PHP-Server.git"
     }
   ],
   "require": {

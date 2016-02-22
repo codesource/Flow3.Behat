@@ -15,7 +15,7 @@
 
     "se/selenium-server-standalone": "*",
 
-    "cdsrc/flow-php-server": "*"
+    "cdsrc/flow-php-server": "dev-master"
   },
 
   "bin": ["bin/cdsrc-flow-behat"]

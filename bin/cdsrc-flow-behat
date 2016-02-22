@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+
+# Do not change this variable !!
+SCRIPT_DIR=$(cd "$( dirname "$(readlink -f $0)" )" && pwd )
+
+# Calculate the base directory based on the location of the script.
+BASEDIR=$(realpath $SCRIPT_DIR/../../../../..)
+
+# Temporary directory
+TEMP_DIR=/tmp
+
+# The reg-exp used to search for behat sub configuration to import
+FILES_REGEXP=".*\/Packages\/Application\/.*\/Tests\/behat.yml"
+
+# Behat executable path
+BEHAT_BIN=$(readlink -f "$BASEDIR/bin/behat")
+
+# Additional behat options
+BEHAT_OPTIONS=
+
+# Selenium executable path
+SELENIUM_BIN=$(readlink -f "$BASEDIR/bin/selenium-server-standalone")
+
+# Selenium port
+SELENIUM_PORT=8889
+
+# PHP standalone server executable path
+PHP_SERVER_BIN=$(readlink -f "$BASEDIR/bin/cdsrc-flow-php-server")
+
+# PHP executable path
+PHP_BIN=php
+
+# Port for the internal PHP server
+PHP_PORT=8888
+
+# If set to 0 the DB will be left untouched, otherwise it will be recreated
+WIPE_DB=0
+
+# If set to 0 the PHP internal server will not be killed at the end of the tests.
+KILL_PHP_SERVER=1
+
+# The Flow3 context to be used
+USE_FLOW_CONTEXT=Development/Behat
+
+# Flow command
+FLOW_COMMAND="$BASEDIR/flow"
+
+# Print usage
+function usage {
+    BLUE="\033[0;34m"
+    GREY="\033[1;30m"
+    GREEN="\033[0;32m"
+    NC="\033[1;37m"
+    printf "
+${BLUE}Usage:
+  ${NC}$0 [options] [<paths>]
+
+${BLUE}Arguments:
+  ${GREEN}paths               ${NC}Optional path(s) where to search for behat configuration files
+
+${BLUE}Options
+  ${GREEN}--behat-options     ${NC}Add behat options to call ('${GREY}behat --help${NC}' for more details)
+  ${GREEN}--selenium-port     ${NC}Change Selenium standalone server listening port
+  ${GREEN}--php-bin           ${NC}Change PHP binary path
+  ${GREEN}--php-port          ${NC}Change PHP standalone server listening port
+  ${GREEN}--wipe-db           ${NC}Force database to reset his data
+  ${GREEN}--keep-php-server   ${NC}Force PHP server to stay alive after tests
+  ${GREEN}--help              ${NC}Display this help message
+
+"
+    exit 0
+}
+
+# Parse options
+REMAINING_PARAMETERS=
+for i in "$@"; do
+    case $i in
+        --behat-options=*)
+            BEHAT_OPTIONS="${i#*=}"
+            ;;
+        --selenium-port=*)
+            SELENIUM_PORT="${i#*=}"
+            ;;
+        --php-bin=*)
+            PHP_BIN="${i#*=}"
+            ;;
+        --php-port=*)
+            PHP_PORT="${i#*=}"
+            ;;
+        --wipe-db)
+            WIPE_DB=1
+            ;;
+        --keep-php-server)
+            KILL_PHP_SERVER=0
+            ;;
+        --help|--*)
+            usage
+            ;;
+        *)
+            REMAINING_PARAMETERS="$REMAINING_PARAMETERS $i"
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$REMAINING_PARAMETERS" ]; then
+    FILES=$(find $BASEDIR -type f -regex "$FILES_REGEXP" | sort -V)
+else
+    # Read the files list from the remaining parameters, expand the wildcards and filter them with the $FILES_REGEXP
+    TMP_FILES=($REMEMBER_PARAMETERS)
+    TMP_FILES="${TMP_FILES[@]}"
+    for FILE in $TMP_FILES; do
+        FILES="$FILES $(find $FILE -type f -regex "$FILES_REGEXP" | sort -V)"
+    done
+fi
+
+# Make sure that defined sub context have a settings file
+if [ ! -f "$BASEDIR/Configuration/$USE_FLOW_CONTEXT/Settings.yaml" ] ; then
+    echo "Make sure to set a specific 'Settings.yaml' for '$USE_FLOW_CONTEXT' context";
+    exit 1
+fi
+
+if [ -n "$FILES" ]; then
+
+    # Start the php internal server
+    echo "--- Starting PHP standalone server on port $PHP_PORT"
+    PHP_PSID="$($PHP_SERVER_BIN --context="$USE_FLOW_CONTEXT" --address=localhost --port=$PHP_PORT --php=$PHP_BIN)"
+    echo "--- Server PID: $PHP_PSID"
+
+    # Wipe the DB if needed
+    if [ $WIPE_DB -ne 0 ]; then
+        echo "--- Recreating the DB"
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND doctrine:migrate --version=0 &>/dev/null
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND doctrine:migrate &>/dev/null
+    fi
+
+    TEMP_CONFIG_FILE="$TEMP_DIR/behat-config-$RANDOM-$$-$RANDOM.yaml"
+
+    # Start selenium server
+    echo "--- Starting Selenium standalone server on port $SELENIUM_PORT"
+    ($SELENIUM_BIN $SELENIUM_PORT  &>/dev/null) &
+    SELENIUM_PSID=$!
+    echo "--- Selenium PID: $SELENIUM_PSID"
+
+    # Build custom behat config file
+    export BEHAT_PARAMS=$(php -r "echo json_encode(array(
+        'formatters' => array(
+            'pretty' => array(
+                '~',
+            ),
+        ),
+        'translation' => array(
+            'locale' => 'en',
+        ),
+        'extensions' => array(
+            'Behat\MinkExtension' => array(
+                'base_url' => 'http://localhost:$SERVER_PORT/',
+                'show_cmd' => 'firefox %s',
+                'browser_name' => 'firefox',
+                'show_auto' => true,
+                'sessions' => array(
+                    'default' => array(
+                        'selenium2' => array(),
+                    ),
+                ),
+            ),
+        ),
+    ));")
+
+    # Run the tests config file by config file
+    for FILE in $FILES; do
+        $BEHAT_BIN $BEHAT_OPTIONS --config "$FILE"
+        EXIT_STATUS=$?
+        if [ $EXIT_STATUS -ne 0 ]; then
+            break
+        fi
+    done
+
+
+    # Kill PHP server if needed
+    if [ $KILL_PHP_SERVER -ne 0 ]; then
+        kill -9 $PHP_PSID
+        echo "--- Killing Server PID: $PHP_PSID"
+    fi
+
+    # Kill Selenium server
+    kill -9 $SELENIUM_PSID
+    echo "--- Killing Selenium PID: $SELENIUM_PSID"
+
+    exit $EXIT_STATUS
+fi
+
+exit 128

@@ -24,20 +24,14 @@ SELENIUM_BIN=$(readlink -f "$BASEDIR/bin/selenium-server-standalone")
 # Selenium port
 SELENIUM_PORT=8889
 
-# PHP standalone server executable path
-PHP_SERVER_BIN=$(readlink -f "$BASEDIR/bin/cdsrc-flow-php-server")
-
-# PHP executable path
-PHP_BIN=php
-
-# Port for the internal PHP server
-PHP_PORT=8888
+# Port for the standalone HTTP server
+HTTP_PORT=8888
 
 # If set to 0 the DB will be left untouched, otherwise it will be recreated
 WIPE_DB=0
 
-# If set to 0 the PHP internal server will not be killed at the end of the tests.
-KILL_PHP_SERVER=1
+# If set to 0 the standalone HTTP server will not be killed at the end of the tests.
+KILL_HTTP_SERVER=1
 
 # The Flow3 context to be used
 USE_FLOW_CONTEXT=Development/Behat
@@ -61,10 +55,9 @@ ${BLUE}Arguments:
 ${BLUE}Options
   ${GREEN}--behat-options     ${NC}Add behat options to call ('${GREY}behat --help${NC}' for more details)
   ${GREEN}--selenium-port     ${NC}Change Selenium standalone server listening port
-  ${GREEN}--php-bin           ${NC}Change PHP binary path
-  ${GREEN}--php-port          ${NC}Change PHP standalone server listening port
+  ${GREEN}--http-port         ${NC}Change HTTP standalone server listening port
   ${GREEN}--wipe-db           ${NC}Force database to reset his data
-  ${GREEN}--keep-php-server   ${NC}Force PHP server to stay alive after tests
+  ${GREEN}--keep-http-server  ${NC}Force HTTP server to stay alive after tests
   ${GREEN}--help              ${NC}Display this help message
 
 "
@@ -81,17 +74,14 @@ for i in "$@"; do
         --selenium-port=*)
             SELENIUM_PORT="${i#*=}"
             ;;
-        --php-bin=*)
-            PHP_BIN="${i#*=}"
-            ;;
-        --php-port=*)
-            PHP_PORT="${i#*=}"
+        --http-port=*)
+            HTTP_PORT="${i#*=}"
             ;;
         --wipe-db)
             WIPE_DB=1
             ;;
-        --keep-php-server)
-            KILL_PHP_SERVER=0
+        --keep-http-server)
+            KILL_HTTP_SERVER=0
             ;;
         --help|--*)
             usage
@@ -123,9 +113,10 @@ fi
 if [ -n "$FILES" ]; then
 
     # Start the php internal server
-    echo "--- Starting PHP standalone server on port $PHP_PORT"
-    PHP_PSID="$($PHP_SERVER_BIN --context="$USE_FLOW_CONTEXT" --address=localhost --port=$PHP_PORT --php=$PHP_BIN)"
-    echo "--- Server PID: $PHP_PSID"
+    echo "--- Starting HTTP standalone server on port $HTTP_PORT"
+    FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND server:run --host=localhost --port=$HTTP_PORT &> /dev/null &
+    HTTP_PSID=$!
+    echo "--- Server PID: $HTTP_PSID"
 
     # Wipe the DB if needed
     if [ $WIPE_DB -ne 0 ]; then
@@ -138,7 +129,7 @@ if [ -n "$FILES" ]; then
 
     # Start selenium server
     echo "--- Starting Selenium standalone server on port $SELENIUM_PORT"
-    ($SELENIUM_BIN $SELENIUM_PORT  &>/dev/null) &
+    ($SELENIUM_BIN $SELENIUM_PORT -browserSessionReuse  &>/dev/null) &
     SELENIUM_PSID=$!
     echo "--- Selenium PID: $SELENIUM_PSID"
 
@@ -154,7 +145,7 @@ if [ -n "$FILES" ]; then
         ),
         'extensions' => array(
             'Behat\MinkExtension' => array(
-                'base_url' => 'http://localhost:$SERVER_PORT/',
+                'base_url' => 'http://localhost:$HTTP_PORT',
                 'show_cmd' => 'firefox %s',
                 'browser_name' => 'firefox',
                 'show_auto' => true,
@@ -177,10 +168,10 @@ if [ -n "$FILES" ]; then
     done
 
 
-    # Kill PHP server if needed
-    if [ $KILL_PHP_SERVER -ne 0 ]; then
-        kill -9 $PHP_PSID
-        echo "--- Killing Server PID: $PHP_PSID"
+    # Kill HTTP server if needed
+    if [ $KILL_HTTP_SERVER -ne 0 ]; then
+        kill -9 $HTTP_PSID
+        echo "--- Killing Server PID: $HTTP_PSID"
     fi
 
     # Kill Selenium server

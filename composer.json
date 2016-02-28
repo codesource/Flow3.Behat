@@ -1,21 +1,15 @@
 {
   "name": "cdsrc/flow-behat",
   "description": "Behat for TYPO3 Flow Framework",
-  "repositories": [
-    {
-      "type": "git",
-      "url": "https://github.com/codesource/Flow3.PHP-Server.git"
-    }
-  ],
   "require": {
+    "typo3/flow": "*",
+    
     "behat/behat": "*",
     "behat/mink-extension": "*",
     "behat/mink-goutte-driver": "*",
     "behat/mink-selenium2-driver": "*",
 
-    "se/selenium-server-standalone": "*",
-
-    "cdsrc/flow-php-server": "dev-master"
+    "se/selenium-server-standalone": "*"
   },
 
   "bin": ["bin/cdsrc-flow-behat"]

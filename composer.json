@@ -3,7 +3,7 @@
   "description": "Behat for TYPO3 Flow Framework",
   "require": {
     "typo3/flow": "*",
-    
+
     "behat/behat": "*",
     "behat/mink-extension": "*",
     "behat/mink-goutte-driver": "*",

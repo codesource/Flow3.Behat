@@ -133,6 +133,9 @@ if [ -n "$FILES" ]; then
     SELENIUM_PSID=$!
     echo "--- Selenium PID: $SELENIUM_PSID"
 
+    # Let servers time to load
+    sleep 2;
+
     # Build custom behat config file
     export BEHAT_PARAMS=$(php -r "echo json_encode(array(
         'formatters' => array(

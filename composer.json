@@ -12,5 +12,11 @@
     "se/selenium-server-standalone": "*"
   },
 
-  "bin": ["bin/cdsrc-flow-behat"]
+  "bin": ["bin/cdsrc-flow-behat"],
+
+  "autoload": {
+    "psr-4": {
+      "CDSRC\\Flow\\Behat\\": "src/"
+    }
+  }
 }

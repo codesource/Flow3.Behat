@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(cd "$( dirname "$(readlink -f $0)" )" && pwd )
 
 # Calculate the base directory based on the location of the script.
-BASEDIR=$(realpath $SCRIPT_DIR/../../../../..)
+BASEDIR=$(realpath "$SCRIPT_DIR/../../../../..")
 
 # Temporary directory
 TEMP_DIR=/tmp
@@ -67,7 +67,7 @@ ${BLUE}Options
 # Parse options
 REMAINING_PARAMETERS=
 for i in "$@"; do
-    case $i in
+    case "$i" in
         --behat-options=*)
             BEHAT_OPTIONS="${i#*=}"
             ;;
@@ -94,13 +94,13 @@ for i in "$@"; do
 done
 
 if [ -z "$REMAINING_PARAMETERS" ]; then
-    FILES=$(find $BASEDIR -type f -regex "$FILES_REGEXP" | sort -V)
+    FILES=$(find "$BASEDIR" -type f -regex "$FILES_REGEXP" | sort -V)
 else
     # Read the files list from the remaining parameters, expand the wildcards and filter them with the $FILES_REGEXP
-    TMP_FILES=($REMEMBER_PARAMETERS)
+    TMP_FILES=("$REMAINING_PARAMETERS")
     TMP_FILES="${TMP_FILES[@]}"
-    for FILE in $TMP_FILES; do
-        FILES="$FILES $(find $FILE -type f -regex "$FILES_REGEXP" | sort -V)"
+    for FILE in "$TMP_FILES"; do
+        FILES="$FILES $(find ${FILE} -type f -regex ${FILES_REGEXP} | sort -V)"
     done
 fi
 
@@ -114,22 +114,20 @@ if [ -n "$FILES" ]; then
 
     # Start the php internal server
     echo "--- Starting HTTP standalone server on port $HTTP_PORT"
-    FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND server:run --host=localhost --port=$HTTP_PORT &> /dev/null &
+    FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
     HTTP_PSID=$!
     echo "--- Server PID: $HTTP_PSID"
 
     # Wipe the DB if needed
-    if [ $WIPE_DB -ne 0 ]; then
+    if [ ${WIPE_DB} -ne 0 ]; then
         echo "--- Recreating the DB"
-        FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND doctrine:migrate --version=0 &>/dev/null
-        FLOW_CONTEXT="$USE_FLOW_CONTEXT" $FLOW_COMMAND doctrine:migrate &>/dev/null
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate --version=0 &>/dev/null
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate &>/dev/null
     fi
-
-    TEMP_CONFIG_FILE="$TEMP_DIR/behat-config-$RANDOM-$$-$RANDOM.yaml"
 
     # Start selenium server
     echo "--- Starting Selenium standalone server on port $SELENIUM_PORT"
-    ($SELENIUM_BIN $SELENIUM_PORT -browserSessionReuse  &>/dev/null) &
+    ("$SELENIUM_BIN" "$SELENIUM_PORT" -browserSessionReuse  &>/dev/null) &
     SELENIUM_PSID=$!
     echo "--- Selenium PID: $SELENIUM_PSID"
 
@@ -162,26 +160,26 @@ if [ -n "$FILES" ]; then
     ));")
 
     # Run the tests config file by config file
-    for FILE in $FILES; do
-        $BEHAT_BIN $BEHAT_OPTIONS --config "$FILE"
+    for FILE in "$FILES"; do
+        "$BEHAT_BIN" "$BEHAT_OPTIONS" --config "$FILE"
         EXIT_STATUS=$?
-        if [ $EXIT_STATUS -ne 0 ]; then
+        if [ ${EXIT_STATUS} -ne 0 ]; then
             break
         fi
     done
 
 
     # Kill HTTP server if needed
-    if [ $KILL_HTTP_SERVER -ne 0 ]; then
-        kill -9 $HTTP_PSID
+    if [ ${KILL_HTTP_SERVER} -ne 0 ]; then
+        kill -9 "$HTTP_PSID"
         echo "--- Killing Server PID: $HTTP_PSID"
     fi
 
     # Kill Selenium server
-    kill -9 $SELENIUM_PSID
+    kill -9 "$SELENIUM_PSID"
     echo "--- Killing Selenium PID: $SELENIUM_PSID"
 
-    exit $EXIT_STATUS
+    exit "$EXIT_STATUS"
 fi
 
 exit 128

@@ -114,6 +114,10 @@ if [ -n "$FILES" ]; then
 
     # Start the php internal server
     echo "--- Starting HTTP standalone server on port $HTTP_PORT"
+    if [[ -n $(lsof -i ":$HTTP_PORT" | grep "LISTEN") ]] ; then
+        echo "Unable to start HTTP server, $HTTP_PORT port is already used!";
+        exit 1;
+    fi
     FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
     HTTP_PSID=$!
     echo "--- Server PID: $HTTP_PSID"

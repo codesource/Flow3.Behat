@@ -12,10 +12,6 @@
     "se/selenium-server-standalone": "*"
   },
 
-  "bugs": {
-    "url": "https://github.com/codesource/Flow3.Behat/issues"
-  },
-
   "bin": ["bin/cdsrc-flow-behat"],
 
   "autoload": {

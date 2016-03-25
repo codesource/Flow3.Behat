@@ -5,23 +5,33 @@
 
 namespace CDSRC\Flow\Behat\Dictionary;
 
+use Behat\Testwork\Hook\Scope\BeforeSuiteScope;
+use CDSRC\Flow\Behat\DataFixtures\Purger\ORMPurger;
+use CDSRC\Flow\Behat\RequestHandler;
+use CDSRC\Flow\Behat\Utility\BootstrapUtility;
 use Doctrine\Common\DataFixtures\FixtureInterface;
 use Doctrine\Common\DataFixtures\Loader;
 use Doctrine\Common\DataFixtures\Executor\ORMExecutor;
-use Doctrine\Common\DataFixtures\Purger\ORMPurger;
 
 trait FixturesDictionary
 {
-    /**
-     * @var bool
-     */
-    protected $flowBootstrapLoaded = false;
 
     /**
      *
      * @var \Doctrine\Common\Persistence\ObjectManager
      */
     protected $doctrineEntityManager;
+
+    /**
+     * Initialize Flow bootstrap
+     *
+     * @param BeforeSuiteScope $scope
+     *
+     * @BeforeSuite
+     */
+    public static function initializeFlowBootstrap(BeforeSuiteScope $scope){
+        BootstrapUtility::getBootstrap();
+    }
 
     /**
      * Fixtures present in given file or directory should be loaded
@@ -34,8 +44,6 @@ trait FixturesDictionary
      */
     public function iLoadFixturesIn($source)
     {
-        $this->loadFlowBootstrap();
-
         $loader = new Loader();
         if (file_exists($source)) {
             if (is_dir($source)) {
@@ -44,7 +52,7 @@ trait FixturesDictionary
                 $loader->loadFromFile($source);
             }
         } elseif (class_exists($source)) {
-            if (!$source instanceof FixtureInterface::class){
+            if (!is_subclass_of($source, FixtureInterface::class)){
                 throw new \Exception(sprintf('"%s" must implement "Doctrine\Common\DataFixtures\FixtureInterface"',
                     $source));
             }
@@ -52,29 +60,11 @@ trait FixturesDictionary
         } else {
             throw new \Exception(sprintf('"%s" is not a valid fixtures reference', $source));
         }
+        $fixtures = $loader->getFixtures();
+        // TODO: Find a good solution to have other purger and executor (MongoDB, PHPCR)
         $purger = new ORMPurger();
-        $executor = new ORMExecutor($this->doctrineEntityManager, $purger);
-        $executor->execute($loader->getFixtures());
-    }
-
-
-    protected function loadFlowBootstrap()
-    {
-        if (!$this->flowBootstrapLoaded) {
-            $context = 'Development/Behat';
-
-            $_SERVER['FLOW_ROOTPATH'] = dirname(__FILE__) . '/../../../../../';
-
-            if (DIRECTORY_SEPARATOR === '/') {
-                // Fixes an issue with the autoloader, see FLOW-183
-                shell_exec('cd ' . escapeshellarg($_SERVER['FLOW_ROOTPATH']) . ' && FLOW_CONTEXT="' . $context . '" ./flow flow:cache:warmup');
-            }
-
-            require_once($_SERVER['FLOW_ROOTPATH'] . 'Packages/Framework/TYPO3.Flow/Classes/TYPO3/Flow/Core/Bootstrap.php');
-            $bootstrap = new \TYPO3\Flow\Core\Bootstrap($context);
-            $bootstrap->run();
-            $this->doctrineEntityManager =  $bootstrap->getObjectManager()->get('\Doctrine\Common\Persistence\ObjectManager');
-        }
-        $this->flowBootstrapLoaded = true;
+        $purger->setFixtures($fixtures);
+        $executor = new ORMExecutor(BootstrapUtility::getObjectManager()->get('Doctrine\Common\Persistence\ObjectManager'), $purger);
+        $executor->execute($fixtures, false);
     }
 }

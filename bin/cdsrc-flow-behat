@@ -119,10 +119,7 @@ if [ -n "$FILES" ]; then
         exit 1;
     fi
     FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
-
-    # Give time to HTTP server to start
-    sleep 1
-    HTTP_PSID=`lsof -ti tcp:"$HTTP_PORT"`
+    HTTP_PSID=$!
     echo "--- Server PID: $HTTP_PSID"
 
     # Wipe the DB if needed
@@ -168,7 +165,7 @@ if [ -n "$FILES" ]; then
 
     # Run the tests config file by config file
     for FILE in "$FILES"; do
-        "$BEHAT_BIN" "$BEHAT_OPTIONS" --config "$FILE"
+        "$BEHAT_BIN" ${BEHAT_OPTIONS} --config "$FILE"
         EXIT_STATUS=$?
         if [ ${EXIT_STATUS} -ne 0 ]; then
             break

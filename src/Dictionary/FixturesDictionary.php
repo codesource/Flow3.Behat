@@ -13,6 +13,9 @@ use Doctrine\Common\DataFixtures\FixtureInterface;
 use Doctrine\Common\DataFixtures\Loader;
 use Doctrine\Common\DataFixtures\Executor\ORMExecutor;
 
+# Force autoload registration for testing files
+BootstrapUtility::registerClassAutoLoader();
+
 trait FixturesDictionary
 {
 

@@ -9,9 +9,6 @@ BASEDIR=$(realpath "$SCRIPT_DIR/../../../../..")
 # Temporary directory
 TEMP_DIR=/tmp
 
-# The reg-exp used to search for behat sub configuration to import
-FILES_REGEXP=".*\/Packages\/Application\/.*\/Tests\/behat.yml"
-
 # Behat executable path
 BEHAT_BIN=$(readlink -f "$BASEDIR/bin/behat")
 
@@ -39,6 +36,10 @@ USE_FLOW_CONTEXT=Development/Behat
 # Flow command
 FLOW_COMMAND="$BASEDIR/flow"
 
+# Test files by config
+TEST_FILES=()
+CONFIG_FILES=()
+
 # Print usage
 function usage {
     BLUE="\033[0;34m"
@@ -50,7 +51,9 @@ ${BLUE}Usage:
   ${NC}$0 [options] [<paths>]
 
 ${BLUE}Arguments:
-  ${GREEN}paths               ${NC}Optional path(s) where to search for behat configuration files
+  ${GREEN}paths               ${NC}Optional path(s) where to search for behat configuration files or features/scenarios files
+  ${GREEN}                    ${NC}You can add multiple configuration/feature/scenarios files
+  ${GREEN}                    ${NC}('${GREY}behat --help${NC}' for more details)
 
 ${BLUE}Options
   ${GREEN}--behat-options     ${NC}Add behat options to call ('${GREY}behat --help${NC}' for more details)
@@ -87,22 +90,11 @@ for i in "$@"; do
             usage
             ;;
         *)
-            REMAINING_PARAMETERS="$REMAINING_PARAMETERS $i"
+            REMAINING_PARAMETERS="$REMAINING_PARAMETERS \"$i\""
             ;;
     esac
     shift
 done
-
-if [ -z "$REMAINING_PARAMETERS" ]; then
-    FILES=$(find "$BASEDIR" -type f -regex "$FILES_REGEXP" | sort -V)
-else
-    # Read the files list from the remaining parameters, expand the wildcards and filter them with the $FILES_REGEXP
-    TMP_FILES=("$REMAINING_PARAMETERS")
-    TMP_FILES="${TMP_FILES[@]}"
-    for FILE in "$TMP_FILES"; do
-        FILES="$FILES $(find ${FILE} -type f -regex ${FILES_REGEXP} | sort -V)"
-    done
-fi
 
 # Make sure that defined sub context have a settings file
 if [ ! -f "$BASEDIR/Configuration/$USE_FLOW_CONTEXT/Settings.yaml" ] ; then
@@ -110,7 +102,9 @@ if [ ! -f "$BASEDIR/Configuration/$USE_FLOW_CONTEXT/Settings.yaml" ] ; then
     exit 1
 fi
 
-if [ -n "$FILES" ]; then
+CALLS_PARAMETER=$(php -f "$SCRIPT_DIR/ParameterBuilder.php" "${REMAINING_PARAMETERS}")
+
+if [ -n "$CALLS_PARAMETER" ]; then
 
     # Start the php internal server
     echo "--- Starting HTTP standalone server on port $HTTP_PORT"
@@ -121,9 +115,9 @@ if [ -n "$FILES" ]; then
     FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
 
     # Give time to HTTP server to start
-    sleep 1
-    HTTP_PSID=`lsof -ti tcp:"$HTTP_PORT"`
-    echo "--- Server PID: $HTTP_PSID"
+    sleep 2
+    HTTP_PID=`lsof -ti tcp:"$HTTP_PORT"`
+    echo "--- Server PID: $HTTP_PID"
 
     # Wipe the DB if needed
     if [ ${WIPE_DB} -ne 0 ]; then
@@ -135,8 +129,8 @@ if [ -n "$FILES" ]; then
     # Start selenium server
     echo "--- Starting Selenium standalone server on port $SELENIUM_PORT"
     ("$SELENIUM_BIN" "$SELENIUM_PORT" -browserSessionReuse  &>/dev/null) &
-    SELENIUM_PSID=$!
-    echo "--- Selenium PID: $SELENIUM_PSID"
+    SELENIUM_PID=$!
+    echo "--- Selenium PID: $SELENIUM_PID"
 
     # Let servers time to load
     sleep 2;
@@ -167,24 +161,26 @@ if [ -n "$FILES" ]; then
     ));")
 
     # Run the tests config file by config file
-    for FILE in "$FILES"; do
-        "$BEHAT_BIN" ${BEHAT_OPTIONS} --config "$FILE"
+    while read -r CALL_PARAMETER; do
+        "$BEHAT_BIN" ${BEHAT_OPTIONS} ${CALL_PARAMETER}
         EXIT_STATUS=$?
         if [ ${EXIT_STATUS} -ne 0 ]; then
             break
         fi
-    done
+    done <<< "$CALLS_PARAMETER"
 
 
     # Kill HTTP server if needed
     if [ ${KILL_HTTP_SERVER} -ne 0 ]; then
-        kill -9 "$HTTP_PSID"
-        echo "--- Killing Server PID: $HTTP_PSID"
+        # Make sure to have the right PID
+        HTTP_PID=`lsof -ti tcp:"$HTTP_PORT"`
+        kill -9 "$HTTP_PID"
+        echo "--- Killing Server PID: $HTTP_PID"
     fi
 
     # Kill Selenium server
-    kill -9 "$SELENIUM_PSID"
-    echo "--- Killing Selenium PID: $SELENIUM_PSID"
+    kill -9 "$SELENIUM_PID"
+    echo "--- Killing Selenium PID: $SELENIUM_PID"
 
     exit "$EXIT_STATUS"
 fi

@@ -55,8 +55,6 @@ class BootstrapUtility
      */
     public static function getBootstrap(){
         if (!isset($GLOBALS['FlowBootstrap'])) {
-            spl_autoload_register(array(self::class, 'loadClassForTesting'));
-
             $_SERVER['FLOW_ROOTPATH'] = self::$rootPath;
             $_SERVER['FLOW_WEBPATH'] = self::$rootPath . 'Web/';
 
@@ -80,4 +78,22 @@ class BootstrapUtility
     public static function getObjectManager(){
         return self::getBootstrap()->getObjectManager();
     }
+
+    /**
+     * Register class loader for testing classes
+     *
+     * @return void
+     */
+    public static function registerClassAutoLoader(){
+        foreach(spl_autoload_functions() as $registerFunction){
+            if(count($registerFunction) >= 2) {
+                list($class, $function) = $registerFunction;
+                if ($class === self::class && $function === 'loadClassForTesting') {
+                    return;
+                }
+            }
+        }
+        spl_autoload_register(array(self::class, 'loadClassForTesting'));
+    }
 }
+

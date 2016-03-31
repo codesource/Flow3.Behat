@@ -58,6 +58,12 @@ class BootstrapUtility
             $_SERVER['FLOW_ROOTPATH'] = self::$rootPath;
             $_SERVER['FLOW_WEBPATH'] = self::$rootPath . 'Web/';
 
+            // Make sure that session path is set to a readable folder
+            $sessionSavePath = ini_get('session.save_path');
+            if(!is_dir($sessionSavePath) || !is_readable($sessionSavePath)){
+                throw new \Exception('Session "'.$sessionSavePath.'"save path do not exist or is not readable.');
+            }
+
             $bootstrap = new FlowBootstrap(self::$context);
             Scripts::initializeClassLoader($bootstrap);
             Scripts::initializeSignalSlot($bootstrap);

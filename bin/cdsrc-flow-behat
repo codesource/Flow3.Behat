@@ -116,7 +116,7 @@ if [ -n "$CALLS_PARAMETER" ]; then
 
     # Give time to HTTP server to start
     sleep 1
-    HTTP_PID=$(lsof -ti tcp:${HTTP_PORT})
+    HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
     echo "--- Server PID: $HTTP_PID"
 
     # Wipe the DB if needed
@@ -173,7 +173,7 @@ if [ -n "$CALLS_PARAMETER" ]; then
     # Kill HTTP server if needed
     if [ ${KILL_HTTP_SERVER} -ne 0 ]; then
         # Make sure to have the right PID
-        HTTP_PID=$(lsof -ti tcp:${HTTP_PORT})
+        HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
         kill -9 "$HTTP_PID"
         echo "--- Killing Server PID: $HTTP_PID"
     fi

@@ -51,7 +51,9 @@ class BootstrapUtility
     /**
      * Get flow bootstrap
      *
-     * @return FlowBootstrap
+     * @return \TYPO3\Flow\Core\Bootstrap
+     *
+     * @throws \Exception
      */
     public static function getBootstrap(){
         if (!isset($GLOBALS['FlowBootstrap'])) {

@@ -42,6 +42,7 @@ class ORMPurger extends ORMPurgerBase implements PurgerInterface
      */
     public function purge()
     {
+        /** @var FixtureInterface $fixture */
         foreach ($this->fixtures as $fixture) {
             $fixture->down($this->em);
         }

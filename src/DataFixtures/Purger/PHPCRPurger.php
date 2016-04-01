@@ -6,6 +6,7 @@
 
 namespace CDSRC\Flow\Behat\DataFixtures\Purger;
 
+use CDSRC\Flow\Behat\DataFixtures\FixtureInterface;
 use Doctrine\Common\DataFixtures\Purger\PHPCRPurger as PHPCRPurgerBase;
 use Doctrine\ODM\PHPCR\DocumentManager;
 
@@ -43,6 +44,7 @@ class PHPCRPurger extends PHPCRPurgerBase implements PurgerInterface
      */
     public function purge()
     {
+        /** @var FixtureInterface $fixture */
         foreach ($this->fixtures as $fixture) {
             $fixture->down($this->dm);
         }

@@ -5,6 +5,7 @@
 
 namespace CDSRC\Flow\Behat\DataFixtures\Purger;
 
+use CDSRC\Flow\Behat\DataFixtures\FixtureInterface;
 use Doctrine\Common\DataFixtures\Purger\MongoDBPurger as MongoDBPurgerBase;
 use Doctrine\ODM\MongoDB\DocumentManager;
 
@@ -41,6 +42,7 @@ class MongoDBPurger extends MongoDBPurgerBase implements PurgerInterface
      */
     public function purge()
     {
+        /** @var FixtureInterface $fixture */
         foreach ($this->fixtures as $fixture) {
             $fixture->down($this->dm);
         }

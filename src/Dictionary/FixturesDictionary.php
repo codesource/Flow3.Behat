@@ -7,11 +7,11 @@ namespace CDSRC\Flow\Behat\Dictionary;
 
 use Behat\Testwork\Hook\Scope\BeforeSuiteScope;
 use CDSRC\Flow\Behat\DataFixtures\Purger\ORMPurger;
-use CDSRC\Flow\Behat\RequestHandler;
 use CDSRC\Flow\Behat\Utility\BootstrapUtility;
 use Doctrine\Common\DataFixtures\FixtureInterface;
 use Doctrine\Common\DataFixtures\Loader;
 use Doctrine\Common\DataFixtures\Executor\ORMExecutor;
+use Doctrine\Common\Persistence\ObjectManager;
 
 # Force autoload registration for testing files
 BootstrapUtility::registerClassAutoLoader();
@@ -21,7 +21,7 @@ trait FixturesDictionary
 
     /**
      *
-     * @var \Doctrine\Common\Persistence\ObjectManager
+     * @var ObjectManager
      */
     protected $doctrineEntityManager;
 
@@ -67,7 +67,7 @@ trait FixturesDictionary
         // TODO: Find a good solution to have other purger and executor (MongoDB, PHPCR)
         $purger = new ORMPurger();
         $purger->setFixtures($fixtures);
-        $executor = new ORMExecutor(BootstrapUtility::getObjectManager()->get('Doctrine\Common\Persistence\ObjectManager'), $purger);
+        $executor = new ORMExecutor(BootstrapUtility::getObjectManager()->get(ObjectManager::class), $purger);
         $executor->execute($fixtures, false);
     }
 }

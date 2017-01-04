@@ -36,6 +36,15 @@ USE_FLOW_CONTEXT=Development/Behat
 # Flow command
 FLOW_COMMAND="$BASEDIR/flow"
 
+# Use this browser for tests
+BROWSER=firefox
+
+# Path to browser driver
+BROWSER_DRIVER_PATH=/opt/webdriver/geckodriver
+
+# Name of browser driver system variable
+BROWSER_DRIVER_NAME=webdriver.gecko.driver
+
 # Test files by config
 TEST_FILES=()
 CONFIG_FILES=()
@@ -61,6 +70,8 @@ ${BLUE}Options
   ${GREEN}--http-port         ${NC}Change HTTP standalone server listening port
   ${GREEN}--wipe-db           ${NC}Force database to reset his data
   ${GREEN}--keep-http-server  ${NC}Force HTTP server to stay alive after tests
+  ${GREEN}--browser           ${NC}Use this browser for tests (firefox, chrome, safari, ...)
+  ${GREEN}--browser-driver    ${NC}Path to WebDriver for the selected browser
   ${GREEN}--help              ${NC}Display this help message
 
 "
@@ -86,6 +97,24 @@ for i in "$@"; do
         --keep-http-server)
             KILL_HTTP_SERVER=0
             ;;
+        --browser=*)
+            BROWSER="${i#*=}"
+            case $BROWSER in
+                firefox)
+                    BROWSER_DRIVER_NAME=webdriver.gecko.driver
+                    ;;
+                *chrome*)
+                    BROWSER_DRIVER_NAME=webdriver.chrome.driver
+                    ;;
+                *)
+                    echo "Browser not supported"
+                    usage
+                    ;;
+            esac
+            ;;
+        --browser-driver=*)
+            BROWSER_DRIVER_PATH="${i#*=}"
+            ;;
         --help|--*)
             usage
             ;;
@@ -106,6 +135,21 @@ CALLS_PARAMETER=$(php -f "$SCRIPT_DIR/ParameterBuilder.php" "${REMAINING_PARAMET
 
 if [ -n "$CALLS_PARAMETER" ]; then
 
+    # Wipe the DB if needed
+    if [ ${WIPE_DB} -ne 0 ]; then
+        echo "--- Recreating the DB"
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate --version=0 &> /dev/null
+        if [ $? -ne 0 ]; then
+            echo "Unable to clear the database, run 'FLOW_CONTEXT=$USE_FLOW_CONTEXT $FLOW_COMMAND doctrine:migrate --version=0' for more detail."
+            exit 1
+        fi
+        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate &> /dev/null
+        if [ $? -ne 0 ]; then
+            echo "Unable to create the schema of the database, run 'FLOW_CONTEXT=$USE_FLOW_CONTEXT $FLOW_COMMAND doctrine:migrate' for more detail."
+            exit 1
+        fi
+    fi
+
     # Start the php internal server
     echo "--- Starting HTTP standalone server on port $HTTP_PORT"
     if [[ -n $(lsof -i ":$HTTP_PORT" | grep "LISTEN") ]] ; then
@@ -113,27 +157,34 @@ if [ -n "$CALLS_PARAMETER" ]; then
         exit 1;
     fi
     FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
-
     # Give time to HTTP server to start
     sleep 1
     HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
     echo "--- Server PID: $HTTP_PID"
-
-    # Wipe the DB if needed
-    if [ ${WIPE_DB} -ne 0 ]; then
-        echo "--- Recreating the DB"
-        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate --version=0 &>/dev/null
-        FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" doctrine:migrate &>/dev/null
+    if [ -z ${HTTP_PID} ]; then
+        echo "Unable start HTTP SERVER, run 'FLOW_CONTEXT=$USE_FLOW_CONTEXT $FLOW_COMMAND server:run --host=localhost --port=$HTTP_PORT' for more detail."
+        exit 1
     fi
 
     # Start selenium server
     echo "--- Starting Selenium standalone server on port $SELENIUM_PORT"
-    ("$SELENIUM_BIN" "$SELENIUM_PORT" -browserSessionReuse  &>/dev/null) &
+    (java -jar -D"$BROWSER_DRIVER_NAME"="$BROWSER_DRIVER_PATH" "$SELENIUM_BIN.jar" -port "$SELENIUM_PORT"  &>/dev/null) &
     SELENIUM_PID=$!
     echo "--- Selenium PID: $SELENIUM_PID"
 
     # Let servers time to load
     sleep 2;
+    if [ -z $(lsof -ti tcp:${SELENIUM_PORT} -stcp:LISTEN) ]; then
+        echo "Unable start HTTP SERVER, run 'java -jar -D$BROWSER_DRIVER_NAME=$BROWSER_DRIVER_PATH $SELENIUM_BIN.jar -port $SELENIUM_PORT' for more detail."
+        # Kill HTTP server if needed
+        if [ ${KILL_HTTP_SERVER} -ne 0 ]; then
+            # Make sure to have the right PID
+            HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
+            kill -9 "$HTTP_PID" &> /dev/null
+            echo "--- Killing Server PID: $HTTP_PID"
+        fi
+        exit 1
+    fi
 
     # Build custom behat config file
     export BEHAT_PARAMS=$(php -r "echo json_encode(array(
@@ -147,18 +198,18 @@ if [ -n "$CALLS_PARAMETER" ]; then
         ),
         'extensions' => array(
             'Behat\MinkExtension' => array(
-                'base_url' => 'http://localhost:$HTTP_PORT',
-                'show_cmd' => 'firefox %s',
-                'browser_name' => 'firefox',
-                'show_auto' => true,
+                'base_url' => 'http://127.0.0.1:$HTTP_PORT',
                 'sessions' => array(
                     'default' => array(
-                        'selenium2' => array(),
+                        'selenium2' => array(
+                            'wd_host' => 'http://127.0.0.1:$SELENIUM_PORT/wd/hub',
+                            'browser' => '$BROWSER',
+                        ),
                     ),
                 ),
             ),
         ),
-    ));")
+    ));");
 
     # Run the tests config file by config file
     while read -r CALL_PARAMETER; do
@@ -174,12 +225,12 @@ if [ -n "$CALLS_PARAMETER" ]; then
     if [ ${KILL_HTTP_SERVER} -ne 0 ]; then
         # Make sure to have the right PID
         HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
-        kill -9 "$HTTP_PID"
+        kill -9 "$HTTP_PID" &> /dev/null
         echo "--- Killing Server PID: $HTTP_PID"
     fi
 
     # Kill Selenium server
-    kill -9 "$SELENIUM_PID"
+    kill -9 "$SELENIUM_PID" &> /dev/null
     echo "--- Killing Selenium PID: $SELENIUM_PID"
 
     exit "$EXIT_STATUS"

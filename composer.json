@@ -1,8 +1,8 @@
 {
   "name": "cdsrc/flow-behat",
-  "description": "Behat for TYPO3 Flow Framework",
+  "description": "Behat for Neos Flow Framework",
   "require": {
-    "typo3/flow": "*",
+    "neos/flow": "*",
 
     "behat/behat": "*",
     "behat/mink-extension": "*",

@@ -5,9 +5,9 @@
 
 namespace CDSRC\Flow\Behat\Utility;
 
-use TYPO3\Flow\Core\Booting\Scripts;
-use TYPO3\Flow\Core\Bootstrap as FlowBootstrap;
-use TYPO3\Flow\Exception;
+use Neos\Flow\Core\Booting\Scripts;
+use Neos\Flow\Core\Bootstrap as FlowBootstrap;
+use Neos\Flow\Exception;
 
 class BootstrapUtility
 {
@@ -51,7 +51,7 @@ class BootstrapUtility
     /**
      * Get flow bootstrap
      *
-     * @return \TYPO3\Flow\Core\Bootstrap
+     * @return \Neos\Flow\Core\Bootstrap
      *
      * @throws \Exception
      */
@@ -80,7 +80,7 @@ class BootstrapUtility
     /**
      * Get flow object manager
      *
-     * @return \TYPO3\Flow\Object\ObjectManagerInterface
+     * @return \Neos\Flow\Object\ObjectManagerInterface
      * @throws Exception
      */
     public static function getObjectManager(){

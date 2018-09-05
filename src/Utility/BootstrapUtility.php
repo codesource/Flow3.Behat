@@ -22,7 +22,8 @@ class BootstrapUtility
      * @param string $className
      * @return void
      */
-    public static function loadClassForTesting($className) {
+    public static function loadClassForTesting($className)
+    {
         $classNameParts = explode('\\', $className);
         if (!is_array($classNameParts)) {
             return;
@@ -55,15 +56,21 @@ class BootstrapUtility
      *
      * @throws \Exception
      */
-    public static function getBootstrap(){
+    public static function getBootstrap()
+    {
         if (!isset($GLOBALS['FlowBootstrap'])) {
             $_SERVER['FLOW_ROOTPATH'] = self::$rootPath;
             $_SERVER['FLOW_WEBPATH'] = self::$rootPath . 'Web/';
 
             // Make sure that session path is set to a readable folder
             $sessionSavePath = ini_get('session.save_path');
-            if(!is_dir($sessionSavePath) || !is_readable($sessionSavePath)){
-                throw new \Exception('Session "'.$sessionSavePath.'"save path do not exist or is not readable.');
+            if (!is_dir($sessionSavePath) || !is_readable($sessionSavePath)) {
+                $dir = sys_get_temp_dir();
+                $dir = rtrim($dir, '/');
+                $sessionSavePath = $path = sprintf('%s/%s%s', $dir, 'behat_session_', mt_rand(100000, mt_getrandmax()));
+                if (!is_dir($dir) || !is_writable($dir) || !mkdir($path) || !ini_set('session.save_path', $path)) {
+                    throw new \Exception('Session "' . $path . '"save path do not exist or is not readable.');
+                }
             }
 
             $bootstrap = new FlowBootstrap(self::$context);
@@ -74,6 +81,7 @@ class BootstrapUtility
             $sequence->invoke($bootstrap);
             $GLOBALS['FlowBootstrap'] = $bootstrap;
         }
+
         return $GLOBALS['FlowBootstrap'];
     }
 
@@ -83,7 +91,8 @@ class BootstrapUtility
      * @return \Neos\Flow\Object\ObjectManagerInterface
      * @throws Exception
      */
-    public static function getObjectManager(){
+    public static function getObjectManager()
+    {
         return self::getBootstrap()->getObjectManager();
     }
 
@@ -92,9 +101,10 @@ class BootstrapUtility
      *
      * @return void
      */
-    public static function registerClassAutoLoader(){
-        foreach(spl_autoload_functions() as $registerFunction){
-            if(count($registerFunction) >= 2) {
+    public static function registerClassAutoLoader()
+    {
+        foreach (spl_autoload_functions() as $registerFunction) {
+            if (count($registerFunction) >= 2) {
                 list($class, $function) = $registerFunction;
                 if ($class === self::class && $function === 'loadClassForTesting') {
                     return;

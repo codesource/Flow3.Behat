@@ -152,17 +152,22 @@ if [ -n "$CALLS_PARAMETER" ]; then
 
     # Start the php internal server
     echo "--- Starting HTTP standalone server on port $HTTP_PORT"
-    if [[ -n $(lsof -i ":$HTTP_PORT" | grep "LISTEN") ]] ; then
-        echo "Unable to start HTTP server, $HTTP_PORT port is already used!";
+    HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
+    if [[ -n $HTTP_PID ]] ; then
+        echo "Unable to start HTTP server, $HTTP_PORT port is already used by $HTTP_PID!";
         exit 1;
     fi
-    FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=localhost --port="$HTTP_PORT" &> /dev/null &
+    FLOW_CONTEXT="$USE_FLOW_CONTEXT" "$FLOW_COMMAND" server:run --host=127.0.0.1 --port="$HTTP_PORT" &> /dev/null &
     # Give time to HTTP server to start
     sleep 1
     HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
+    if [ -z ${HTTP_PID} ]; then
+        sleep 3
+        HTTP_PID=$(lsof -ti tcp:${HTTP_PORT} -stcp:LISTEN)
+    fi
     echo "--- Server PID: $HTTP_PID"
     if [ -z ${HTTP_PID} ]; then
-        echo "Unable start HTTP SERVER, run 'FLOW_CONTEXT=$USE_FLOW_CONTEXT $FLOW_COMMAND server:run --host=localhost --port=$HTTP_PORT' for more detail."
+        echo "Unable start HTTP SERVER, run 'FLOW_CONTEXT=$USE_FLOW_CONTEXT $FLOW_COMMAND server:run --host=127.0.0.1 --port=$HTTP_PORT' for more detail."
         exit 1
     fi
 

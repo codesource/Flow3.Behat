@@ -6,7 +6,6 @@
 namespace CDSRC\Flow\Behat\DataFixtures;
 
 
-use Doctrine\Common\Persistence\ObjectManager;
 use Doctrine\ORM\EntityManagerInterface;
 
 abstract class AbstractFixture implements FixtureInterface
@@ -19,7 +18,7 @@ abstract class AbstractFixture implements FixtureInterface
     /**
      * {@inheritdoc}
      */
-    public function load(ObjectManager $manager)
+    public function load(EntityManagerInterface $manager)
     {
         throw new \Exception('Must be implemented if called');
     }
